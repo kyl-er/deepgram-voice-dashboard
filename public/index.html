@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DG//VOX — Deepgram Voice Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#E9E9E7;color:#0A0A0A;font-family:'JetBrains Mono',monospace}
+  *{box-sizing:border-box}
+  a{color:#0A0A0A;text-decoration:none;border-bottom:1px solid rgba(10,10,10,.35)}
+  a:hover{color:#E9E9E7;background:#0A0A0A}
+  ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:rgba(10,10,10,.22)}
+  input,select,textarea,button{font-family:'JetBrains Mono',monospace}
+  .wrap{min-height:100vh;padding:22px 22px 40px;display:flex;flex-direction:column;gap:22px}
+  .brand{background:#0A0A0A;color:#E9E9E7;padding:12px 20px 10px;clip-path:polygon(0 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%)}
+  .brand h1{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:30px;line-height:1;letter-spacing:-.02em;margin:0}
+  .brand small{font-size:10px;letter-spacing:.3em}
+  .tabs{display:flex;gap:0;border:1px solid #0A0A0A}
+  .tabs button{flex:1;background:transparent;border:0;padding:12px 8px;font-size:11px;letter-spacing:.22em;cursor:pointer;color:#0A0A0A}
+  .tabs button.active{background:#0A0A0A;color:#E9E9E7;font-weight:700}
+  .panel{display:none;flex-direction:column;gap:22px}
+  .panel.active{display:flex}
+  .row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+  .card{border-bottom:1px solid rgba(10,10,10,.9);padding-bottom:4px;display:flex;justify-content:space-between;align-items:baseline}
+  .card b{font-size:10px;letter-spacing:.26em;font-weight:700}
+  .card span{font-size:10px;letter-spacing:.14em;color:rgba(10,10,10,.66)}
+  .btn{background:transparent;color:#0A0A0A;border:1px solid #0A0A0A;padding:11px 16px;font-size:10px;letter-spacing:.2em;cursor:pointer}
+  .btn:hover{background:#0A0A0A;color:#E9E9E7}
+  .btn.solid{background:#0A0A0A;color:#E9E9E7}
+  .btn.solid:hover{background:#2A2A28}
+  .btn:disabled{opacity:.4;cursor:default}
+  .field{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center;padding:3px 0}
+  .field label{font-size:10px;letter-spacing:.12em}
+  .field .path{font-size:10px;color:rgba(10,10,10,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .field select,.field input{background:transparent;color:#0A0A0A;border:1px solid rgba(10,10,10,.35);font-size:10px;padding:6px;width:100%}
+  textarea.box,input.line{background:transparent;color:#0A0A0A;border:1px solid rgba(10,10,10,.35);font-size:11px;line-height:1.5;padding:8px;width:100%}
+  input.line{border:0;border-bottom:1px solid rgba(10,10,10,.66)}
+  pre.dump{background:#0A0A0A;color:#E9E9E7;padding:12px;margin:4px 0 0;font-size:10px;line-height:1.5;max-height:300px;overflow:auto;white-space:pre-wrap;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
+  .pill{font-size:10px;letter-spacing:.16em;border:1px solid rgba(10,10,10,.35);padding:4px 8px}
+  .tline{display:grid;grid-template-columns:58px 1fr;gap:14px;align-items:start;padding:6px 0}
+  .check{display:flex;gap:8px;align-items:center;font-size:10px;letter-spacing:.14em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="row" style="align-items:flex-start">
+    <div class="brand">
+      <h1>DG//VOX</h1>
+      <small>VOICE&nbsp;AGENT&nbsp;CONSOLE</small>
+    </div>
+    <div style="flex:1 1 240px;display:flex;flex-wrap:wrap;gap:26px;align-items:flex-end;padding-bottom:4px;border-bottom:1px solid rgba(10,10,10,.9)">
+      <div style="display:grid;gap:2px"><span style="font-size:10px;letter-spacing:.22em;color:rgba(10,10,10,.66)">STATE</span><span id="phase" style="font-size:15px;letter-spacing:.12em;font-weight:700">IDLE</span></div>
+      <div style="display:grid;gap:2px"><span style="font-size:10px;letter-spacing:.22em;color:rgba(10,10,10,.66)">UPTIME</span><span id="uptime" style="font-size:15px">00:00</span></div>
+      <div style="display:grid;gap:2px"><span style="font-size:10px;letter-spacing:.22em;color:rgba(10,10,10,.66)">TURNS</span><span id="turns" style="font-size:15px">00</span></div>
+      <div style="display:grid;gap:2px"><span style="font-size:10px;letter-spacing:.22em;color:rgba(10,10,10,.66)">BACKEND</span><span id="health" style="font-size:11px">…</span></div>
+    </div>
+    <div class="tabs" style="flex:0 1 420px;min-width:280px" role="tablist">
+      <button data-tab="agent" class="active" role="tab">AGENT · HOME</button>
+      <button data-tab="simple" role="tab">SIMPLE VOICE</button>
+      <button data-tab="intel" role="tab">TEXT INTEL</button>
+    </div>
+  </div>
+
+  <!-- ============ TAB 1: VOICE AGENT (HOME) ============ -->
+  <section id="tab-agent" class="panel active">
+    <div class="row">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btnMic" class="btn">ARM MIC</button>
+        <button id="btnConnect" class="btn solid">CONNECT</button>
+        <button id="btnSpk" class="btn" title="Play a TTS sample through a plain <audio> element to verify your speakers">SPEAKER TEST</button>
+        <span class="pill" id="connPill">IDLE</span>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:18px;font-size:10px;letter-spacing:.18em;color:rgba(10,10,10,.66)">
+        <span>IN <b id="inDb">-60</b> dB</span><span>OUT <b id="outDb">-60</b> dB</span><span id="srLabel">24k · linear16</span>
+      </div>
+    </div>
+
+    <div style="position:relative">
+      <canvas id="vox" style="display:block;width:100%;height:440px"></canvas>
+      <div style="position:absolute;left:0;top:0;font-size:10px;letter-spacing:.24em;color:rgba(10,10,10,.66)">MIC&nbsp;/&nbsp;SPECTRAL&nbsp;TERRAIN</div>
+      <div style="position:absolute;left:0;bottom:0;font-size:10px;letter-spacing:.24em;color:rgba(10,10,10,.66)">TTS&nbsp;/&nbsp;SINE&nbsp;BED</div>
+    </div>
+
+    <div class="row">
+      <div style="flex:2 1 420px;min-width:300px;display:flex;flex-direction:column;gap:10px">
+        <div class="card"><b>TRANSCRIPT</b><span>ConversationText</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select id="sessionSelect" class="line" style="flex:1 1 160px"><option value="">— unsaved session —</option></select>
+          <input id="sessionName" class="line" placeholder="session name…" style="flex:1 1 140px">
+          <button id="btnSessionSave" class="btn">SAVE</button>
+          <button id="btnSessionLoad" class="btn">LOAD</button>
+          <button id="btnSessionDelete" class="btn">DELETE</button>
+          <button id="btnSessionNew" class="btn">NEW</button>
+        </div>
+        <div id="transcript" style="display:grid;gap:6px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="inject" class="line" placeholder="inject user message…" style="flex:1 1 200px">
+          <button id="btnInject" class="btn">INJECT</button>
+          <button id="btnEot" class="btn">FORCE EOT</button>
+          <button id="btnInterrupt" class="btn">INTERRUPT</button>
+        </div>
+      </div>
+      <div style="flex:1 1 300px;min-width:270px;display:flex;flex-direction:column;gap:10px">
+        <div class="card"><b>CONFIG</b><button id="btnAdv" style="background:none;border:0;font-size:10px;letter-spacing:.18em;cursor:pointer;color:rgba(10,10,10,.66)">+ ALL OPTIONS</button></div>
+        <div id="fields" style="display:grid;gap:4px"></div>
+        <div style="display:grid;gap:5px;padding-top:6px">
+          <span style="font-size:10px;letter-spacing:.2em;color:rgba(10,10,10,.66)">agent.think.prompt</span>
+          <textarea id="prompt" class="box" rows="3">You are a terse, precise voice operator with real tools: list_files and read_file, both scoped to the user's home directory (path is relative to home, e.g. "Projects" or "Documents/notes", blank = home root). When asked about files or folders, call the exact relative path implied by the request — do not default to the home root unless asked for that. Report only what the tool actually returned; never guess or invent file names. Answer in one or two short sentences.</textarea>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="btnPrompt" class="btn" style="flex:1">UpdatePrompt</button>
+          <button id="btnCopy" class="btn solid" style="flex:1">COPY SETTINGS</button>
+        </div>
+        <div id="advBox" style="display:none">
+          <div style="font-size:10px;letter-spacing:.22em;color:rgba(10,10,10,.66);margin:6px 0 4px">SETTINGS&nbsp;PAYLOAD</div>
+          <pre class="dump" id="settingsJson"></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div style="flex:1 1 300px;min-width:260px;display:flex;flex-direction:column;gap:8px">
+        <div class="card"><b>EVENT STREAM</b><span>websocket</span></div>
+        <div id="log" style="display:grid;gap:3px;max-height:180px;overflow:auto;font-size:10px"></div>
+      </div>
+      <div style="flex:1 1 300px;min-width:260px;display:flex;flex-direction:column;gap:8px">
+        <div class="card"><b>PLUGINS&nbsp;/&nbsp;ENDPOINTS</b><span>deepgram-agent.js</span></div>
+        <div id="plugins" style="display:grid;gap:6px;font-size:11px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 2: SIMPLE VOICE (STT + TTS) ============ -->
+  <section id="tab-simple" class="panel">
+    <div class="row">
+      <div style="flex:1 1 320px;min-width:280px;display:flex;flex-direction:column;gap:10px">
+        <div class="card"><b>STT · SPEECH → TEXT</b><span>POST /v1/listen via /api/stt</span></div>
+        <div class="field"><div><label>STT model</label><div class="path">listen.model</div></div>
+          <select id="sttModel"><option>nova-3</option><option>nova-2</option><option>flux-general-en</option><option>flux-general-multi</option></select></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="btnRec" class="btn">● RECORD</button>
+          <button id="btnStopRec" class="btn" disabled>■ STOP + TRANSCRIBE</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="file" id="sttFile" accept="audio/*" style="font-size:10px">
+          <button id="btnFileStt" class="btn">TRANSCRIBE FILE</button>
+        </div>
+        <div class="check"><input type="checkbox" id="sttSmart" checked><label for="sttSmart">smart_format</label>
+          <input type="checkbox" id="sttDiarize"><label for="sttDiarize">diarize</label></div>
+        <div style="font-size:10px;letter-spacing:.2em;color:rgba(10,10,10,.66)">TRANSCRIPT</div>
+        <pre class="dump" id="sttOut" style="background:#0A0A0A">— no transcription yet —</pre>
+      </div>
+      <div style="flex:1 1 320px;min-width:280px;display:flex;flex-direction:column;gap:10px">
+        <div class="card"><b>TTS · TEXT → SPEECH</b><span>POST /v1/speak via /api/tts</span></div>
+        <div class="field"><div><label>TTS voice</label><div class="path">speak.model</div></div>
+          <select id="ttsModel"><option>flux-hannah-en</option><option>flux-kit-en</option><option>flux-alexis-en</option><option>flux-cliff-en</option><option>flux-sienna-en</option><option>flux-cole-en</option><option>flux-brooke-en</option><option>flux-colin-en</option><option>flux-gemma-en</option><option>flux-haley-en</option><option>flux-heather-en</option><option>flux-miles-en</option><option>flux-sean-en</option><option>flux-bree-en</option><option>flux-brittany-en</option><option>flux-bruce-en</option><option>flux-conor-en</option><option>flux-donovan-en</option><option>flux-drew-en</option><option>flux-elise-en</option><option>flux-jack-en</option><option>flux-kai-en</option><option>flux-kelsey-en</option><option>flux-maeve-en</option><option>flux-marcelo-en</option><option>flux-marcus-en</option><option>flux-meena-en</option><option>flux-meghan-en</option><option>flux-naveen-en</option><option>flux-paige-en</option><option>flux-priya-en</option><option>flux-rufus-en</option><option>flux-sharon-en</option><option>flux-tanner-en</option><option>flux-wade-en</option><option>flux-wes-en</option><option>aura-2-agathe-fr</option><option>aura-2-agustina-es</option><option>aura-2-alvaro-es</option><option>aura-2-ama-ja</option><option>aura-2-amalthea-en</option><option>aura-2-andromeda-en</option><option>aura-2-antonia-es</option><option>aura-2-apollo-en</option><option>aura-2-aquila-es</option><option>aura-2-arcas-en</option><option>aura-2-aries-en</option><option>aura-2-asteria-en</option><option>aura-2-athena-en</option><option>aura-2-atlas-en</option><option>aura-2-aurelia-de</option><option>aura-2-aurora-en</option><option>aura-2-beatrix-nl</option><option>aura-2-callista-en</option><option>aura-2-carina-es</option><option>aura-2-celeste-es</option><option>aura-2-cesare-it</option><option>aura-2-cinzia-it</option><option>aura-2-cora-en</option><option>aura-2-cordelia-en</option><option>aura-2-cornelia-nl</option><option>aura-2-daphne-nl</option><option>aura-2-delia-en</option><option>aura-2-demetra-it</option><option>aura-2-diana-es</option><option>aura-2-dionisio-it</option><option>aura-2-draco-en</option><option>aura-2-ebisu-ja</option><option>aura-2-elara-de</option><option>aura-2-electra-en</option><option>aura-2-elio-it</option><option>aura-2-estrella-es</option><option>aura-2-fabian-de</option><option>aura-2-flavio-it</option><option>aura-2-fujin-ja</option><option>aura-2-gloria-es</option><option>aura-2-harmonia-en</option><option>aura-2-hector-fr</option><option>aura-2-helena-en</option><option>aura-2-hera-en</option><option>aura-2-hermes-en</option><option>aura-2-hestia-nl</option><option>aura-2-hyperion-en</option><option>aura-2-iris-en</option><option>aura-2-izanami-ja</option><option>aura-2-janus-en</option><option>aura-2-javier-es</option><option>aura-2-julius-de</option><option>aura-2-juno-en</option><option>aura-2-jupiter-en</option><option>aura-2-kara-de</option><option>aura-2-lara-de</option><option>aura-2-lars-nl</option><option>aura-2-leda-nl</option><option>aura-2-livia-it</option><option>aura-2-luciano-es</option><option>aura-2-luna-en</option><option>aura-2-maia-it</option><option>aura-2-mars-en</option><option>aura-2-melia-it</option><option>aura-2-minerva-en</option><option>aura-2-neptune-en</option><option>aura-2-nestor-es</option><option>aura-2-odysseus-en</option><option>aura-2-olivia-es</option><option>aura-2-ophelia-en</option><option>aura-2-orion-en</option><option>aura-2-orpheus-en</option><option>aura-2-pandora-en</option><option>aura-2-phoebe-en</option><option>aura-2-pluto-en</option><option>aura-2-rhea-nl</option><option>aura-2-roman-nl</option><option>aura-2-sander-nl</option><option>aura-2-saturn-en</option><option>aura-2-selena-es</option><option>aura-2-selene-en</option><option>aura-2-silvia-es</option><option>aura-2-sirio-es</option><option>aura-2-thalia-en</option><option>aura-2-theia-en</option><option>aura-2-uzume-ja</option><option>aura-2-valerio-es</option><option>aura-2-vesta-en</option><option>aura-2-viktoria-de</option><option>aura-2-zeus-en</option><option>aura-angus-en</option><option>aura-arcas-en</option><option>aura-asteria-en</option><option>aura-athena-en</option><option>aura-helios-en</option><option>aura-hera-en</option><option>aura-luna-en</option><option>aura-orion-en</option><option>aura-orpheus-en</option><option>aura-perseus-en</option><option>aura-stella-en</option><option>aura-zeus-en</option></select></div>
+        <textarea id="ttsText" class="box" rows="4">Channel open. This is the simple voice lab. Type anything and press speak.</textarea>
+        <div style="display:flex;gap:8px"><button id="btnSpeak" class="btn solid" style="flex:1">SPEAK</button></div>
+        <audio id="ttsAudio" controls style="width:100%"></audio>
+        <pre class="dump" id="ttsOut">— no synthesis yet —</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 3: TEXT INTELLIGENCE ============ -->
+  <section id="tab-intel" class="panel">
+    <div class="card"><b>TEXT INTEL · /v1/read</b><span>summarize · sentiment · topics · intents — same DG//VOX skin</span></div>
+    <div class="row">
+      <div style="flex:2 1 420px;min-width:300px;display:flex;flex-direction:column;gap:10px">
+        <textarea id="intelText" class="box" rows="8">Jake calls the Honda dealership and speaks with Josh about the new Honda Civic 2023. Jake schedules a test drive for the hybrid model on Friday and provides his contact information. Josh confirms the appointment and tells Jake to call if he has any further questions. Overall everyone sounds happy with the plan.</textarea>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <span class="check"><input type="checkbox" id="fSum" checked><label for="fSum">summarize</label></span>
+          <span class="check"><input type="checkbox" id="fSent" checked><label for="fSent">sentiment</label></span>
+          <span class="check"><input type="checkbox" id="fTop" checked><label for="fTop">topics</label></span>
+          <span class="check"><input type="checkbox" id="fInt" checked><label for="fInt">intents</label></span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="btnAnalyze" class="btn solid" style="flex:1">ANALYZE TEXT</button>
+          <button id="btnSample" class="btn">LOAD CALL-CENTER SAMPLE</button>
+        </div>
+      </div>
+      <div style="flex:1 1 300px;min-width:270px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:10px;letter-spacing:.2em;color:rgba(10,10,10,.66)">SUMMARY</div>
+        <pre class="dump" id="intelSummary">—</pre>
+        <div style="font-size:10px;letter-spacing:.2em;color:rgba(10,10,10,.66)">SENTIMENT</div>
+        <pre class="dump" id="intelSent">—</pre>
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:1 1 300px"><div style="font-size:10px;letter-spacing:.2em;color:rgba(10,10,10,.66)">TOPICS / INTENTS</div><pre class="dump" id="intelTopics">—</pre></div>
+      <div style="flex:1 1 300px"><div style="font-size:10px;letter-spacing:.2em;color:rgba(10,10,10,.66)">RAW JSON</div><pre class="dump" id="intelRaw">—</pre></div>
+    </div>
+    <div style="font-size:10px;color:rgba(10,10,10,.6)">Docs: <a href="https://developers.deepgram.com/reference/text-intelligence/analyze-text" target="_blank">Analyze Text</a> · POST /v1/read?summarize=true&amp;sentiment=true&amp;topics=true&amp;intents=true&amp;language=en — body {"text":"…"}</div>
+  </section>
+
+  <div style="font-size:10px;letter-spacing:.1em;color:rgba(10,10,10,.55)">
+    Deepgram modes wired: <b>Voice Agent</b> (wss://agent.deepgram.com + /auth/grant) · <b>STT</b> (/v1/listen) · <b>TTS</b> (/v1/speak) · <b>Read</b> (/v1/read).
+    Docs: <a href="https://developers.deepgram.com/docs/configure-voice-agent" target="_blank">agent config</a> · <a href="https://developers.deepgram.com/docs/voice-agent-inputs" target="_blank">inputs</a> · <a href="https://developers.deepgram.com/docs/voice-agent-outputs" target="_blank">outputs</a> · <a href="https://playground.deepgram.com/?endpoint=agent" target="_blank">playground</a>
+  </div>
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
