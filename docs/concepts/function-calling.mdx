@@ -1,0 +1,126 @@
+---
+title: "Function calling"
+description: "How the agent's tools are declared, who executes them, and the one setting that silently breaks everything."
+icon: "plug"
+---
+
+Every tool the agent can use is a **plugin** registered in `public/deepgram-agent.js`. The registry does two things:
+
+1. `functionDefs()` turns plugins into the `agent.think.functions` array of the Settings message, so the LLM knows the tools exist.
+2. `dispatchFunctionCall()` runs the matching `handler` when Deepgram sends a `FunctionCallRequest`, and replies with `FunctionCallResponse`.
+
+## Client-side vs server-side
+
+<Tabs>
+  <Tab title="Client-side (default)" icon="monitor">
+    Deepgram sends `FunctionCallRequest` to the browser. The plugin's `handler` runs there, usually by POSTing to your local server:
+
+    ```js public/deepgram-agent.js
+    registerPlugin({
+      name: 'list_files',
+      description: "List files under the user's home directory.",
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string', description: 'Relative path' } },
+      },
+      handler: async ({ path } = {}) => {
+        const r = await fetch(`${RUNTIME.functionEndpoint}/list_files`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: path || '' }),
+        });
+        return r.json();
+      },
+    });
+    ```
+
+    This works with `RUNTIME.functionEndpoint = '/api/agent/functions'` (relative) because the browser is the one calling it.
+  </Tab>
+  <Tab title="Server-side" icon="cloud">
+    Set `serverSide: true` and Deepgram's servers call the endpoint directly. That only works when `RUNTIME.functionEndpoint` is an **absolute, publicly reachable** URL:
+
+    ```js
+    configure({ functionEndpoint: 'https://dgvox.your-tailnet.ts.net/api/agent/functions' });
+
+    registerPlugin({
+      name: 'lookup_record',
+      serverSide: true,
+      parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    });
+    ```
+
+    `functionDefs()` then adds `endpoint: { url, method: 'post', headers: {} }` to that function.
+  </Tab>
+</Tabs>
+
+<Danger>
+**A relative `endpoint.url` breaks the whole agent, not just the tool.** Deepgram rejects the entire Settings message with `UNPARSABLE_CLIENT_MESSAGE` on `agent.think`. The socket stays open, but the agent never thinks or speaks. `functionDefs()` guards against this: it only emits `endpoint` when the URL matches `^https?://`, and otherwise falls back to client-side dispatch.
+</Danger>
+
+## Plugin fields
+
+<ParamField body="name" type="string" required>
+  Function name the LLM calls. Must match the server route name if the handler forwards to `/api/agent/functions/:name`.
+</ParamField>
+<ParamField body="description" type="string">
+  What the LLM reads to decide when to call it. Defaults to `name`. Write it like an instruction: the built-in `browser_read_page` says "Call this after navigating or clicking".
+</ParamField>
+<ParamField body="parameters" type="JSON Schema">
+  Argument schema. Defaults to `{ type: 'object', properties: {} }`.
+</ParamField>
+<ParamField body="defer_until_eot" type="boolean" default="false">
+  Hold the call until the user's end of turn is confirmed. Use for irreversible actions. `end_call` and `graph_clear` set it.
+</ParamField>
+<ParamField body="serverSide" type="boolean" default="false">
+  Let Deepgram call the endpoint directly. Ignored unless `functionEndpoint` is absolute.
+</ParamField>
+<ParamField body="handler" type="async (args) => any">
+  Client-side implementation. Its return value is JSON-stringified into the `FunctionCallResponse`. A thrown error becomes `{ error }`.
+</ParamField>
+
+## Arguments arrive as a string
+
+Deepgram's `FunctionCallRequest` carries args as a **JSON string in `arguments`**, not an object in `input`:
+
+```json FunctionCallRequest
+{
+  "type": "FunctionCallRequest",
+  "functions": [
+    { "id": "fc_1", "name": "list_files", "arguments": "{\"path\":\"Projects\"}", "client_side": true }
+  ]
+}
+```
+
+`dispatchFunctionCall` parses `fn.arguments`. Reading the wrong field silently passes `{}` to every handler (which is how `list_files` once always listed the home root no matter what you asked).
+
+## Errors are answers
+
+On the server, a tool that throws still returns **HTTP 200** with `{ "error": "..." }`. The agent can say "that path is blocked" instead of stalling on a 500 it can't interpret.
+
+## Adding your own tool
+
+<Steps>
+  <Step title="Implement it on the server">
+    Export an async function from `agent-tools.js` that takes the args object and returns JSON, then add it to the `TOOLS` map in `server.js`:
+
+    ```js server.js
+    const TOOLS = {
+      // ...existing tools
+      git_status: gitStatus,
+    };
+    ```
+  </Step>
+  <Step title="Register the plugin in the browser">
+    ```js public/deepgram-agent.js
+    registerPlugin({
+      name: 'git_status',
+      description: 'Show uncommitted changes in a repo under ~/Projects.',
+      parameters: { type: 'object', properties: { repo: { type: 'string' } }, required: ['repo'] },
+      handler: (args) => callTool('git_status', args),
+    });
+    ```
+  </Step>
+  <Step title="Mention it in the prompt and rebuild">
+    Add a line to `DEFAULT_CONFIG.prompt` so the model knows when to reach for it, then run `npm run build`.
+  </Step>
+</Steps>

@@ -1,0 +1,51 @@
+---
+title: "Plugins"
+description: "registerPlugin(), functionDefs(), dispatchFunctionCall() and the plugins map."
+icon: "puzzle"
+---
+
+For the concepts (client vs server dispatch, the relative-URL trap), read [Function calling](/concepts/function-calling) first. This page is the API.
+
+<ResponseField name="plugins" type="Map<string, Plugin>">
+  The registry. Keyed by `name`. Delete entries to remove built-ins: `plugins.delete('run_bash')`.
+</ResponseField>
+
+<ResponseField name="registerPlugin(plugin)" type="Plugin">
+  Adds or replaces a plugin. Throws if `name` is missing. Register before `startSession()`; the function list is baked into Settings at connect time.
+</ResponseField>
+
+<ResponseField name="functionDefs()" type="FunctionDef[]">
+  Maps plugins to Deepgram's `agent.think.functions` shape: `{ name, description, parameters, defer_until_eot?, endpoint? }`. `endpoint` only appears for `serverSide` plugins with an absolute `functionEndpoint`.
+</ResponseField>
+
+<ResponseField name="dispatchFunctionCall(session, msg)" type="Promise<void>">
+  For each entry in `msg.functions`: parse `arguments`, run the handler, and call `session.sendFunctionCallResponse(id, name, JSON.stringify(result))`. Missing handler → `{ error: 'No client handler for <name>' }`. Thrown error → `{ error: message }`.
+</ResponseField>
+
+## Removing dangerous tools
+
+To ship the runtime somewhere without a shell or browser control:
+
+```js
+import { plugins } from './deepgram-agent.bundle.js';
+
+for (const name of ['run_bash', 'browser_navigate', 'browser_click', 'browser_type', 'browser_tabs', 'browser_switch_tab', 'browser_read_page']) {
+  plugins.delete(name);
+}
+```
+
+Also remove the matching entries from the `TOOLS` map in `server.js`, since the route stays callable otherwise.
+
+## Built-in plugins
+
+| Name | `defer_until_eot` | Handler |
+|---|---|---|
+| `end_call` | yes | local, returns `{ ended: true }` |
+| `lookup_record` | | POST `lookup_record` (demo) |
+| `list_files`, `read_file` | | POST to server |
+| `browser_*` (6) | | POST to server |
+| `graph_node_add`, `graph_edge_add`, `graph_node_rm`, `graph_inspect` | | POST to server |
+| `graph_clear` | yes | POST to server |
+| `run_bash` | | POST to server |
+
+`get_weather` is registered separately in `public/app.js`.

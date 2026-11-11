@@ -1,0 +1,65 @@
+---
+title: "Browser"
+description: "Drive your real, logged-in Chrome by voice over the DevTools protocol."
+icon: "globe"
+---
+
+The browser tools use `playwright-core`'s `chromium.connectOverCDP()` to attach to a Chrome **you** started. The agent acts in your real profile with your sign-ins, not a blank automation browser.
+
+## Setup
+
+<CodeGroup>
+```bash Linux
+google-chrome --remote-debugging-port=9223
+```
+
+```bash macOS
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9223
+```
+
+```powershell Windows
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9223
+```
+</CodeGroup>
+
+Use a different port or host with `DGVOX_CDP_URL` (default `http://127.0.0.1:9223`).
+
+## Behavior
+
+- **Lazy attach.** Nothing connects until the first browser call. If Chrome restarts, the next call re-attaches.
+- **One agent tab.** The first call opens a new tab and reuses it. Close it and the next call opens a fresh one. `browser_switch_tab` points the agent at one of your existing tabs instead.
+
+## Functions
+
+<ResponseField name="browser_navigate" type="{ url }">
+  Opens a full `http(s)` URL, waits for `domcontentloaded` (30s timeout). Returns `{ url, title }`. Other schemes are refused.
+</ResponseField>
+
+<ResponseField name="browser_read_page" type="{}">
+  Returns `document.body.innerText`, collapsed and capped at **6,000 characters**, plus `truncated`. The prompt tells the model to call this after every navigate or click rather than guessing.
+</ResponseField>
+
+<ResponseField name="browser_click" type="{ text }">
+  Clicks the first element whose visible text matches (what a voice user actually says, like "Sign in"). Falls back to treating `text` as a CSS selector.
+</ResponseField>
+
+<ResponseField name="browser_type" type="{ text, selector?, submit? }">
+  Fills a field. Without `selector`, uses the first visible text input, textarea or contenteditable. `submit: true` presses Enter.
+</ResponseField>
+
+<ResponseField name="browser_tabs" type="{}">
+  Lists all open tabs as `{ index, url, title, active }`.
+</ResponseField>
+
+<ResponseField name="browser_switch_tab" type="{ index }">
+  Makes tab `index` the agent's working tab and brings it to front.
+</ResponseField>
+
+## Example
+
+```bash
+curl -s -X POST localhost:8787/api/agent/functions/browser_navigate \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://developers.deepgram.com"}'
+# {"url":"https://developers.deepgram.com/","title":"Deepgram Docs"}
+```

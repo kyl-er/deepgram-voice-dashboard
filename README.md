@@ -13,6 +13,18 @@ Deepgram traffic — the browser never sees the key.
 | **SIMPLE VOICE** | `#tab-simple` | STT `POST /v1/listen` (mic record + file upload) · TTS `POST /v1/speak` (Aura-2 + Flux voices) |
 | **TEXT INTEL** | `#tab-intel` | `POST /v1/read?summarize&sentiment&topics&intents` with summary/sentiment/topics rendering |
 
+## Docs
+
+Full documentation lives in [`docs/`](docs/) as a [Mintlify](https://mintlify.com) site:
+guides, the agent tools and their security model, an interactive API reference generated
+from [`docs/api-reference/openapi.json`](docs/api-reference/openapi.json), and the
+`deepgram-agent.js` runtime reference. Preview it locally:
+
+```bash
+npm i -g mint
+cd docs && mint dev   # http://localhost:3000
+```
+
 ## 1. Set your Deepgram API key
 
 Get a key at <https://console.deepgram.com>. Set it once as an OS

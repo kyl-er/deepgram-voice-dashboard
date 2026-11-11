@@ -1,0 +1,56 @@
+---
+title: "Graph"
+description: "Build a live knowledge graph by voice, one visible pulse per call."
+icon: "share-2"
+---
+
+The graph tools shell out to the `rfgraph` CLI from the separate **graph-ctl** project. Its React Flow view (on `:5173`) animates each new node or edge, so the agent is told to add exactly one per call.
+
+<Info>
+graph-ctl's FastAPI server on `:8000` has no node/edge write endpoints, so the CLI is the only write path. DG//VOX calls the venv binary directly instead of `uv run` to avoid re-resolving the environment on every rapid call.
+</Info>
+
+## Setup
+
+| Variable | Default |
+|---|---|
+| `DGVOX_GRAPH_DIR` | `~/Projects/graph-ctl` |
+| `DGVOX_RFGRAPH_BIN` | `$DGVOX_GRAPH_DIR/.venv/bin/rfgraph` |
+
+## Functions
+
+<ResponseField name="graph_node_add" type="{ id, label?, type? }">
+  `id` must match `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$` (e.g. `auth_api`). `label` is free text, single-lined and capped at 120 chars. `type` is a styling hint: `folder`, `file`, `service`, `stub`, `default`.
+</ResponseField>
+
+<ResponseField name="graph_edge_add" type="{ source, target, label?, type? }">
+  Missing endpoints are auto-created as stubs. Labels are relations like `contains`, `imports`, `calls`, `queries`, `reads` (max 48 chars).
+</ResponseField>
+
+<ResponseField name="graph_node_rm" type="{ id }">
+  Removes the node and its edges.
+</ResponseField>
+
+<ResponseField name="graph_inspect" type="{}">
+  Summarized state: counts plus the first 60 nodes and edges as ids and labels only. Full dumps overwhelm a voice model.
+</ResponseField>
+
+<ResponseField name="graph_clear" type="{}">
+  Erases everything. Marked `defer_until_eot`, and the description tells the model to call it only when you clearly ask.
+</ResponseField>
+
+<Note>
+Arguments go to `execFile` as argv, never through a shell, so transcript text in labels can't inject commands.
+</Note>
+
+## Example session
+
+> "Map this repo: server calls Deepgram, server uses agent tools."
+
+```text
+graph_inspect   → { nodeCount: 0, ... }
+graph_node_add  { id: "server", label: "server.js", type: "file" }
+graph_node_add  { id: "deepgram", label: "Deepgram API", type: "service" }
+graph_edge_add  { source: "server", target: "deepgram", label: "calls" }
+graph_edge_add  { source: "server", target: "agent_tools", label: "imports" }   ← auto-creates stub
+```

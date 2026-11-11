@@ -1,0 +1,730 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DG//VOX backend",
+    "version": "1.0.0",
+    "description": "Express proxy in server.js. Holds the Deepgram API key server-side and forwards browser requests to Deepgram. Binds to 127.0.0.1:8787 by default. No auth on these routes; the key never leaves the server."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8787",
+      "description": "Local DG//VOX server (npm start)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Deepgram proxy"
+    },
+    {
+      "name": "Agent functions"
+    },
+    {
+      "name": "Status"
+    }
+  ],
+  "paths": {
+    "/api/deepgram/token": {
+      "post": {
+        "tags": [
+          "Deepgram proxy"
+        ],
+        "summary": "Mint a Voice Agent token",
+        "description": "Calls Deepgram `POST /v1/auth/grant` with the server's key and returns the short-lived JWT as **plain text**. `deepgram-agent.js` `fetchToken()` calls this for every new agent session. The SDK then sends it as the WebSocket subprotocol `[\"bearer\", <jwt>]`.",
+        "operationId": "mintToken",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/KeySelector"
+          },
+          {
+            "name": "ttl",
+            "in": "query",
+            "required": false,
+            "description": "Token lifetime in seconds. Clamped to 60–3600.",
+            "schema": {
+              "type": "integer",
+              "default": 300,
+              "minimum": 60,
+              "maximum": 3600
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ttl": {
+                    "type": "integer",
+                    "description": "Alternative to the `ttl` query param."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JWT, plain text.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              }
+            }
+          },
+          "500": {
+            "description": "No key configured, or an upstream/network error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "no DEEPGRAM_API_KEY in .env"
+              }
+            }
+          }
+        },
+        "x-mint": {
+          "href": "/api-reference/token"
+        }
+      }
+    },
+    "/api/stt": {
+      "post": {
+        "tags": [
+          "Deepgram proxy"
+        ],
+        "summary": "Transcribe audio (prerecorded STT)",
+        "description": "Forwards the raw request body to Deepgram `POST /v1/listen`. **Every query parameter is passed through unchanged**, so any `/v1/listen` option works (`diarize`, `punctuate`, `summarize`, `topics`, ...). Body limit 25 MB. The response is Deepgram's JSON as-is.",
+        "operationId": "transcribe",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/KeySelector"
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "description": "STT model. The UI offers the values in `GET /api/config` → `sttModels`.",
+            "schema": {
+              "type": "string",
+              "default": "nova-3",
+              "enum": [
+                "nova-3",
+                "nova-3-medical",
+                "nova-2",
+                "flux-general-en",
+                "flux-general-multi"
+              ]
+            }
+          },
+          {
+            "name": "smart_format",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "diarize",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Raw audio bytes. Set Content-Type to match (defaults to audio/wav).",
+          "content": {
+            "audio/wav": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "audio/webm": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "audio/mpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deepgram /v1/listen response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "metadata": {
+                    "request_id": "…",
+                    "duration": 4.2
+                  },
+                  "results": {
+                    "channels": [
+                      {
+                        "alternatives": [
+                          {
+                            "transcript": "Bueller? Bueller?",
+                            "confidence": 0.98
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/NoKey"
+          }
+        },
+        "x-mint": {
+          "href": "/api-reference/stt"
+        }
+      }
+    },
+    "/api/tts": {
+      "post": {
+        "tags": [
+          "Deepgram proxy"
+        ],
+        "summary": "Synthesize speech (TTS)",
+        "description": "Forwards `{ text }` to Deepgram `POST /v1/speak?model=…` and streams back the audio bytes with Deepgram's Content-Type (MP3 by default). Extra query params are passed through.",
+        "operationId": "speak",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/KeySelector"
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "description": "Voice. Aura-2 and Flux voices both work here. Can also be sent as `model` in the body.",
+            "schema": {
+              "type": "string",
+              "default": "aura-2-thalia-en",
+              "examples": [
+                "aura-2-thalia-en",
+                "flux-heather-en"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "Text to speak. Must be non-empty.",
+                    "example": "Channel open. What do you need?"
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Fallback when the `model` query param is absent."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio bytes.",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "text required"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/NoKey"
+          }
+        },
+        "x-mint": {
+          "href": "/api-reference/tts"
+        }
+      }
+    },
+    "/api/read": {
+      "post": {
+        "tags": [
+          "Deepgram proxy"
+        ],
+        "summary": "Analyze text (Text Intelligence)",
+        "description": "Forwards to Deepgram `POST /v1/read`. Only these query flags are forwarded: `summarize`, `sentiment`, `topics`, `intents`, `language`, `custom_topic`, `custom_intent`. `language` defaults to `en`.",
+        "operationId": "readText",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/KeySelector"
+          },
+          {
+            "name": "summarize",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sentiment",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "topics",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "intents",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "en"
+            }
+          },
+          {
+            "name": "custom_topic",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "custom_intent",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Send `text` or `url`. If both are present, `text` wins.",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "example": "The demo went well but the client wants pricing by Friday."
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deepgram /v1/read response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "results": {
+                    "summary": {
+                      "text": "Client wants pricing by Friday."
+                    },
+                    "sentiments": {
+                      "average": {
+                        "sentiment": "positive"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neither text nor url provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "provide {text} or {url}"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/NoKey"
+          }
+        },
+        "x-mint": {
+          "href": "/api-reference/read"
+        }
+      }
+    },
+    "/api/agent/functions/{name}": {
+      "post": {
+        "tags": [
+          "Agent functions"
+        ],
+        "summary": "Run an agent tool",
+        "description": "Single dispatch route for every server-side tool the voice agent can call. The browser plugin handlers in `deepgram-agent.js` POST here with the parsed function arguments as the JSON body.\n\nTool failures come back as **HTTP 200 with `{ \"error\": \"…\" }`** so the agent can say what went wrong instead of stalling on a 500. Unknown names echo `{ ok, name, received }`.\n\n> This route is unauthenticated and includes `run_bash`. Anyone who can reach the port has a shell as you.",
+        "operationId": "runAgentFunction",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "Tool name.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "lookup_record",
+                "get_weather",
+                "list_files",
+                "read_file",
+                "browser_navigate",
+                "browser_read_page",
+                "browser_click",
+                "browser_type",
+                "browser_tabs",
+                "browser_switch_tab",
+                "graph_node_add",
+                "graph_edge_add",
+                "graph_node_rm",
+                "graph_inspect",
+                "graph_clear",
+                "run_bash"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Tool arguments. Shape depends on `name`; see the Agent tools guides.",
+                "additionalProperties": true
+              },
+              "examples": {
+                "list_files": {
+                  "summary": "list_files",
+                  "value": {
+                    "path": "Projects"
+                  }
+                },
+                "read_file": {
+                  "summary": "read_file",
+                  "value": {
+                    "path": "Projects/notes.md"
+                  }
+                },
+                "browser_navigate": {
+                  "summary": "browser_navigate",
+                  "value": {
+                    "url": "https://developers.deepgram.com"
+                  }
+                },
+                "browser_type": {
+                  "summary": "browser_type",
+                  "value": {
+                    "text": "voice agent",
+                    "submit": true
+                  }
+                },
+                "graph_edge_add": {
+                  "summary": "graph_edge_add",
+                  "value": {
+                    "source": "server",
+                    "target": "deepgram",
+                    "label": "calls"
+                  }
+                },
+                "run_bash": {
+                  "summary": "run_bash",
+                  "value": {
+                    "command": "git status --short",
+                    "cwd": "~/Projects/deepgram-voice-dashboard"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result, or `{ error }`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "examples": {
+                  "list_files": {
+                    "value": {
+                      "path": "Projects",
+                      "entries": [
+                        {
+                          "name": "graph-ctl",
+                          "type": "dir",
+                          "size": null
+                        }
+                      ]
+                    }
+                  },
+                  "run_bash": {
+                    "value": {
+                      "exit_code": 0,
+                      "stdout": " M server.js",
+                      "truncated": false
+                    }
+                  },
+                  "error": {
+                    "value": {
+                      "error": "path is outside the allowed sandbox or is hidden/blocked"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "list_files / read_file: path does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-mint": {
+          "href": "/api-reference/agent-functions"
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Health check",
+        "description": "Reports whether keys are configured. Does not call Deepgram.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "hasPrimary": {
+                      "type": "boolean"
+                    },
+                    "hasSecondary": {
+                      "type": "boolean"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "time": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true,
+                  "hasPrimary": true,
+                  "hasSecondary": false,
+                  "base": "https://api.deepgram.com",
+                  "time": "2026-11-11T20:00:00.000Z"
+                }
+              }
+            }
+          }
+        },
+        "x-mint": {
+          "href": "/api-reference/health"
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "UI enums",
+        "description": "Safe, static option lists the dashboard uses to populate its dropdowns.",
+        "operationId": "config",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agentSocket": {
+                      "type": "string"
+                    },
+                    "sttModels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "ttsModels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "readFlags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "agentSocket": "wss://agent.deepgram.com/v1/agent/converse",
+                  "sttModels": [
+                    "nova-3",
+                    "nova-3-medical",
+                    "nova-2",
+                    "flux-general-en",
+                    "flux-general-multi"
+                  ],
+                  "ttsModels": [
+                    "aura-2-thalia-en",
+                    "aura-2-asteria-en",
+                    "aura-2-helios-en",
+                    "flux-heather-en",
+                    "flux-kit-en",
+                    "flux-alexis-en"
+                  ],
+                  "readFlags": [
+                    "summarize",
+                    "sentiment",
+                    "topics",
+                    "intents"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-mint": {
+          "href": "/api-reference/config"
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "KeySelector": {
+        "name": "key",
+        "in": "query",
+        "required": false,
+        "description": "Set to `secondary` to use `DEEPGRAM_V2_API_KEY` instead of the primary key (only if it is configured).",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "secondary"
+          ]
+        }
+      }
+    },
+    "responses": {
+      "NoKey": {
+        "description": "No Deepgram key configured, or an upstream/network error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "no key"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    }
+  }
+}

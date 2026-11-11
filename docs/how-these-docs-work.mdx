@@ -1,0 +1,109 @@
+---
+title: "How these docs work"
+description: "A map from every Mintlify concept to the file in this repo that uses it. Read this if Mintlify is new to you."
+icon: "map"
+---
+
+Mintlify is a docs site generator plus hosting. You keep **plain files in your repo** (one JSON config + Markdown/MDX pages + optionally an OpenAPI spec). Mintlify turns them into a site with navigation, search, an AI assistant, and a live API playground. Push to GitHub and the site redeploys.
+
+That's the whole mental model: **files in a folder → website**. Everything below is detail.
+
+## The folder
+
+```text
+docs/
+├── docs.json                  ← the ONE config file: name, colors, logo, navigation
+├── index.mdx                  ← a page (URL: /)
+├── quickstart.mdx             ← a page (URL: /quickstart)
+├── concepts/voice-agent.mdx   ← a page (URL: /concepts/voice-agent), has a React widget
+├── tools/*.mdx
+├── runtime/*.mdx
+├── api-reference/
+│   ├── introduction.mdx       ← hand-written page
+│   └── openapi.json           ← spec → Mintlify GENERATES one page per endpoint
+├── logo/light.svg, dark.svg
+└── favicon.svg
+```
+
+## Concept → where it's used here
+
+| Mintlify concept | What it does | See it in |
+|---|---|---|
+| `docs.json` | Site config. Required fields: `theme`, `name`, `colors.primary`, `navigation`. | `docs/docs.json` |
+| **Pages** | Any `.mdx` file. The path minus extension is both the URL and how you reference it in navigation. | every `.mdx` |
+| **Frontmatter** | YAML at the top of a page: `title`, `description` (used for SEO + AI search), `icon`. | top of every page |
+| **Navigation: tabs** | Top-level sections in the header. | `Guides`, `API reference`, `Runtime (JS)` |
+| **Navigation: groups** | Sidebar sections inside a tab. | `Get started`, `Concepts`, `Agent tools`… |
+| **OpenAPI** | Put `"openapi": "path/to/spec.json"` on a group and list `"METHOD /path"` strings as pages. Each becomes a full reference page with a **Try it** playground. | `API reference` tab |
+| **Components** | JSX-style tags you drop into Markdown. No imports needed. | below |
+| **React widgets** | `export const X = () => …` at the end of a page, then `<X />` inline. Runs on the live site. | `<SpeakPreview />` on [Voice agent](/concepts/voice-agent) |
+| **Mermaid** | Fenced ` ```mermaid ` blocks render as diagrams. | [Architecture](/concepts/architecture) |
+| **Theme / colors / fonts** | Look and feel, all in `docs.json`. Matched to the DG//VOX UI (near-black + bone, Chakra Petch). | `docs.json` |
+
+## Components used in this site
+
+<CardGroup cols={2}>
+  <Card title="Steps" icon="list-ordered" href="/quickstart">Numbered procedure. Quickstart, Configuration.</Card>
+  <Card title="Tabs" icon="panel-top" href="/quickstart">OS-specific instructions in the Quickstart.</Card>
+  <Card title="CodeGroup" icon="code" href="/tools/shell">Several code blocks as tabs. Shell, Browser, Files.</Card>
+  <Card title="Callouts" icon="message-square-warning" href="/tools/overview">`Note` `Info` `Tip` `Warning` `Danger` `Check`.</Card>
+  <Card title="Accordion" icon="chevrons-down-up" href="/troubleshooting">Collapsible Q&A. Troubleshooting.</Card>
+  <Card title="ParamField / ResponseField" icon="list-tree" href="/runtime/overview">Typed field docs. Runtime pages.</Card>
+  <Card title="Expandable" icon="unfold-vertical" href="/runtime/settings">Collapse long field lists. Settings.</Card>
+  <Card title="Card / CardGroup / Columns" icon="layout-grid" href="/">Link grids. Home page.</Card>
+</CardGroup>
+
+## How a page gets into the sidebar
+
+Creating `docs/tools/browser.mdx` makes the page exist at `/tools/browser`. It only shows in the sidebar once you list it in `docs.json`:
+
+```json docs.json
+{
+  "group": "Agent tools",
+  "pages": ["tools/overview", "tools/browser", "tools/files", "tools/shell", "tools/graph"]
+}
+```
+
+## How the API reference works
+
+`api-reference/openapi.json` is a normal OpenAPI 3.1 spec describing `server.js`. The group in `docs.json` points at it:
+
+```json docs.json
+{
+  "group": "Deepgram proxy",
+  "openapi": "api-reference/openapi.json",
+  "pages": ["POST /api/deepgram/token", "POST /api/stt", "POST /api/tts", "POST /api/read"]
+}
+```
+
+Mintlify reads each operation's `summary`, `description`, parameters, request body and response examples, and generates the page plus a request builder that can actually call your local server. Change a route in `server.js`? Update the spec, and the docs follow.
+
+Each operation also sets `x-mint: { "href": "/api-reference/stt" }`, a Mintlify extension that pins the generated page's URL so hand-written pages can link to it reliably.
+
+## Running it
+
+<Steps>
+  <Step title="Install the CLI">
+    ```bash
+    npm i -g mint
+    ```
+  </Step>
+  <Step title="Preview locally">
+    ```bash
+    cd docs
+    mint dev          # http://localhost:3000, hot reload
+    ```
+  </Step>
+  <Step title="Check links">
+    ```bash
+    mint broken-links
+    ```
+  </Step>
+  <Step title="Deploy">
+    Sign in at [mintlify.com](https://mintlify.com), connect the GitHub repo, and set the docs directory to `docs`. Every push to the branch redeploys. You get a `*.mintlify.app` URL, and can add a custom domain later.
+  </Step>
+</Steps>
+
+<Tip>
+Every hosted Mintlify site automatically gets `/llms.txt` (an index of all pages for LLMs) and a search MCP server at `/mcp`, with zero config. Once this is deployed, any agent can query the DG//VOX docs as a tool.
+</Tip>

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "DG//VOX",
+  "description": "Browser console for Deepgram: a live Voice Agent with tool calling, STT + TTS, and Text Intelligence, behind a key-holding Express proxy.",
+  "colors": {
+    "primary": "#0A0A0A",
+    "light": "#E9E9E7",
+    "dark": "#0A0A0A"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.svg",
+  "appearance": {
+    "default": "dark"
+  },
+  "fonts": {
+    "heading": { "family": "Chakra Petch" },
+    "body": { "family": "Inter" }
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "navbar": {
+    "links": [
+      { "type": "github", "href": "https://github.com/kyl-er/deepgram-voice-dashboard" }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Deepgram console",
+      "href": "https://console.deepgram.com"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["index", "quickstart", "configuration"]
+          },
+          {
+            "group": "Concepts",
+            "pages": ["concepts/architecture", "concepts/voice-agent", "concepts/function-calling"]
+          },
+          {
+            "group": "Agent tools",
+            "pages": ["tools/overview", "tools/browser", "tools/files", "tools/shell", "tools/graph"]
+          },
+          {
+            "group": "Help",
+            "pages": ["troubleshooting"]
+          },
+          {
+            "group": "Meta",
+            "pages": ["how-these-docs-work"]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "icon": "square-terminal",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["api-reference/introduction"]
+          },
+          {
+            "group": "Deepgram proxy",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "POST /api/deepgram/token",
+              "POST /api/stt",
+              "POST /api/tts",
+              "POST /api/read"
+            ]
+          },
+          {
+            "group": "Agent functions",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "POST /api/agent/functions/{name}"
+            ]
+          },
+          {
+            "group": "Status",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /api/health",
+              "GET /api/config"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Runtime (JS)",
+        "icon": "braces",
+        "groups": [
+          {
+            "group": "deepgram-agent.js",
+            "pages": ["runtime/overview", "runtime/settings", "runtime/plugins", "runtime/sessions"]
+          }
+        ]
+      }
+    ]
+  },
+  "api": {
+    "playground": { "display": "interactive" },
+    "examples": { "languages": ["curl", "javascript", "python"] }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/kyl-er/deepgram-voice-dashboard"
+    }
+  }
+}

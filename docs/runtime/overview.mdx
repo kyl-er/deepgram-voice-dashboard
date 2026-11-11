@@ -1,0 +1,72 @@
+---
+title: "Runtime overview"
+description: "public/deepgram-agent.js: the single module between the dashboard and Deepgram."
+icon: "braces"
+---
+
+`deepgram-agent.js` is reusable outside DG//VOX. Import it (or the bundle) into any page that needs a Deepgram voice agent with tools.
+
+```js
+import {
+  configure, DEFAULT_CONFIG, SCHEMA,
+  buildAgentConfig, buildSettings,
+  registerPlugin, functionDefs, dispatchFunctionCall, plugins,
+  fetchToken, startSession, RawAgentSocket,
+} from './deepgram-agent.bundle.js';
+```
+
+## Exports at a glance
+
+| Export | Kind | Page |
+|---|---|---|
+| `RUNTIME`, `configure()` | config | below |
+| `SCHEMA`, `DEFAULT_CONFIG`, `buildAgentConfig()`, `buildSettings()` | settings | [Settings](/runtime/settings) |
+| `plugins`, `registerPlugin()`, `functionDefs()`, `dispatchFunctionCall()` | tools | [Plugins](/runtime/plugins) |
+| `fetchToken()`, `startSession()`, `RawAgentSocket` | transport | [Sessions](/runtime/sessions) |
+
+## Two transports
+
+<CardGroup cols={2}>
+  <Card title="SDK path (default)" icon="package">
+    `startSession()` wraps `@deepgram/agents` `AgentSession` + `AgentMicrophone` + `AgentPlayer`. Handles mic capture, playback, barge-in, keepalive and reconnect.
+  </Card>
+  <Card title="Raw path" icon="cable">
+    `RawAgentSocket` is a plain `WebSocket` with hand-built messages. No SDK, no bundler. You manage audio yourself.
+  </Card>
+</CardGroup>
+
+## RUNTIME
+
+The only place URLs live. Change with `configure(patch)`, which `Object.assign`s and returns `RUNTIME`.
+
+<ParamField body="tokenUrl" type="string" default="/api/deepgram/token">
+  Backend route returning a short-lived token as plain text (JSON `{ access_token }` also accepted).
+</ParamField>
+<ParamField body="agentSocket" type="string" default="wss://agent.deepgram.com/v1/agent/converse">
+  Voice Agent endpoint. Override for a regional endpoint or proxy.
+</ParamField>
+<ParamField body="agentId" type="string | null" default="null">
+  Reusable Agent Configuration UUID. When set, replaces the inline `agent` config.
+</ParamField>
+<ParamField body="functionEndpoint" type="string" default="/api/agent/functions">
+  Base for tool calls. Must be absolute for `serverSide` plugins.
+</ParamField>
+<ParamField body="thinkEndpoint" type="string | null" default="null">
+  BYO LLM URL, sent as `agent.think.endpoint`.
+</ParamField>
+<ParamField body="speakEndpoint" type="string | null" default="null">
+  BYO TTS URL for non-Deepgram speak providers.
+</ParamField>
+<ParamField body="sink" type="(kind, payload) => void | null" default="null">
+  Observability hook. Receives every event `startSession()` emits.
+</ParamField>
+<ParamField body="apiKey" type="string | null" default="null">
+  Raw key for local experiments only. Skips the token route. Never ship it.
+</ParamField>
+
+```js Example
+configure({
+  sink: (kind, payload) => console.debug('[agent]', kind, payload),
+  agentId: null,
+});
+```

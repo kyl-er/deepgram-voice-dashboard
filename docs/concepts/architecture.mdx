@@ -1,0 +1,77 @@
+---
+title: "Architecture"
+description: "Three files, one proxy, and the path a spoken request takes from your mic to a tool call and back."
+icon: "workflow"
+---
+
+## The pieces
+
+| File | Runs in | Job |
+|---|---|---|
+| `server.js` | Node | Express proxy. Holds the key, forwards STT / TTS / Read, mints agent tokens, dispatches agent tools. |
+| `env.js` | Node | Resolves `DEEPGRAM_*` from env, shell rc files, or the Windows registry. |
+| `agent-tools.js` | Node | Browser (Playwright over CDP), `rfgraph` graph CLI, and the shell tool. |
+| `public/deepgram-agent.js` | Browser | Runtime adapter: settings builder, plugin registry, token fetch, SDK session. Bundled to `deepgram-agent.bundle.js`. |
+| `public/app.js` + `index.html` | Browser | The three-tab dashboard UI. |
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI[index.html + app.js]
+    RT[deepgram-agent.js<br/>bundled SDK]
+  end
+  subgraph Node["server.js :8787"]
+    TOK["/api/deepgram/token"]
+    PROXY["/api/stt · /api/tts · /api/read"]
+    FN["/api/agent/functions/:name"]
+    TOOLS[agent-tools.js]
+  end
+  DG[(Deepgram REST<br/>api.deepgram.com)]
+  AG[(Voice Agent WS<br/>agent.deepgram.com)]
+  CH[Chrome :9223]
+  SH[bash / PowerShell]
+  GR[rfgraph CLI]
+
+  UI --> RT
+  UI -- audio / text --> PROXY --> DG
+  RT -- fetchToken --> TOK -- /v1/auth/grant --> DG
+  RT <-- "audio + events (JWT subprotocol)" --> AG
+  RT -- tool args --> FN --> TOOLS
+  TOOLS --> CH
+  TOOLS --> SH
+  TOOLS --> GR
+```
+
+## A voice turn, end to end
+
+```mermaid
+sequenceDiagram
+  participant U as You
+  participant B as Browser (deepgram-agent.js)
+  participant S as server.js
+  participant D as Deepgram Voice Agent
+  B->>S: POST /api/deepgram/token
+  S->>D: POST /v1/auth/grant (Token <key>)
+  S-->>B: JWT (plain text, 300s)
+  B->>D: WSS connect, subprotocol ["bearer", jwt]
+  B->>D: Settings (listen / think / speak / functions)
+  D-->>B: SettingsApplied
+  U->>B: "What's in my Projects folder?"
+  B->>D: mic audio (linear16, 24 kHz)
+  D-->>B: FunctionCallRequest list_files {"path":"Projects"}
+  B->>S: POST /api/agent/functions/list_files
+  S-->>B: { entries: [...] }
+  B->>D: FunctionCallResponse
+  D-->>B: ConversationText + TTS audio
+  B->>U: plays reply
+```
+
+<Note>
+Tool calls run **client-side**: Deepgram asks the browser, the browser asks your local server. Deepgram's servers never reach `localhost`. See [Function calling](/concepts/function-calling) for why that matters.
+</Note>
+
+## Why a proxy at all
+
+- **The key never ships to the browser.** The agent gets a 5-minute JWT; STT, TTS and Read go through server routes.
+- **Browsers can't set WebSocket headers.** The token rides the `Sec-WebSocket-Protocol` header instead: `["bearer", jwt]` for grant tokens, `["token", key]` for raw keys.
+- **Tools need a local process.** Reading files, driving Chrome and running commands can't happen from a web page.

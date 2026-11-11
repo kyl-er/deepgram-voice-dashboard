@@ -1,0 +1,42 @@
+---
+title: "Agent tools overview"
+description: "The 16 functions the voice agent can call, and the security model around them."
+icon: "wrench"
+---
+
+All tools are POSTed to `/api/agent/functions/:name` by the browser and executed by the local server. See the [API reference](/api-reference/introduction) for the raw route.
+
+| Family | Functions | Implemented in | Needs |
+|---|---|---|---|
+| [Browser](/tools/browser) | `browser_navigate`, `browser_read_page`, `browser_click`, `browser_type`, `browser_tabs`, `browser_switch_tab` | `agent-tools.js` | Chrome with `--remote-debugging-port=9223` |
+| [Files](/tools/files) | `list_files`, `read_file` | `server.js` | nothing |
+| [Shell](/tools/shell) | `run_bash` | `agent-tools.js` | nothing |
+| [Graph](/tools/graph) | `graph_node_add`, `graph_edge_add`, `graph_node_rm`, `graph_inspect`, `graph_clear` | `agent-tools.js` | `rfgraph` CLI in `~/Projects/graph-ctl` |
+| Demo | `lookup_record`, `get_weather`, `end_call` | `server.js` / browser | nothing |
+
+## Security model
+
+<Warning>
+**A running session is equivalent to an open shell on your machine.** The routes are unauthenticated, `run_bash` has no allowlist, and `browser_read_page` / `read_file` can feed attacker-controlled text into the same model that can call `run_bash`.
+</Warning>
+
+What *is* in place:
+
+<CardGroup cols={2}>
+  <Card title="Loopback bind" icon="lock">
+    `HOST` defaults to `127.0.0.1`. Only processes on your machine can reach the tools.
+  </Card>
+  <Card title="File sandbox" icon="folder-lock">
+    `list_files` / `read_file` are rooted at `$HOME`, refuse `..` escapes, any dot-path component, and secret-looking names.
+  </Card>
+  <Card title="URL scheme guard" icon="shield">
+    `browser_navigate` only accepts `http:` and `https:`. `file://` and `chrome://` are refused.
+  </Card>
+  <Card title="Prompt instruction" icon="message-square-warning">
+    The default system prompt tells the model to treat page and file text as data, never as instructions.
+  </Card>
+</CardGroup>
+
+<Info>
+Exposing over a network? Put it on a private Tailscale tailnet, and consider adding auth middleware in front of `/api/agent/functions` before doing so.
+</Info>

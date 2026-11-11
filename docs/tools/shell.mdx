@@ -1,0 +1,59 @@
+---
+title: "Shell"
+description: "run_bash: an unrestricted command runner, by design."
+icon: "terminal"
+---
+
+<Danger>
+`run_bash` runs whatever the model asks for, as you, with no allowlist. Keep the server on loopback.
+</Danger>
+
+## Function
+
+<ParamField body="command" type="string" required>
+  Command line to run.
+</ParamField>
+<ParamField body="cwd" type="string">
+  Working directory. Absolute or `~/relative`. Defaults to your home directory.
+</ParamField>
+<ParamField body="timeout_ms" type="number" default="30000">
+  Clamped to 1,000–120,000 ms.
+</ParamField>
+
+On Linux and macOS it runs `/bin/bash -lc <command>` (a login shell, so your PATH and rc files apply). On Windows it runs `powershell.exe -NoProfile -Command <command>`.
+
+## Output
+
+<CodeGroup>
+```json Success
+{
+  "exit_code": 0,
+  "stdout": " M server.js\n?? docs/",
+  "truncated": false
+}
+```
+
+```json Failure
+{
+  "exit_code": 128,
+  "error": "command failed",
+  "stdout": "",
+  "stderr": "fatal: not a git repository"
+}
+```
+
+```json Timeout
+{
+  "exit_code": null,
+  "error": "command timed out",
+  "stdout": "",
+  "stderr": ""
+}
+```
+</CodeGroup>
+
+`stdout` is capped at 12,000 characters (`truncated: true` when cut); `stderr` at 2,000.
+
+<Tip>
+The default prompt steers the model to `run_bash` for git, grep, builds and scripts, and to the file tools for plain reads.
+</Tip>
