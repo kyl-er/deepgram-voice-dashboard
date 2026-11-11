@@ -1,0 +1,95 @@
+---
+title: "Settings"
+description: "SCHEMA, DEFAULT_CONFIG, buildAgentConfig() and buildSettings()."
+icon: "sliders-horizontal"
+---
+
+## Flat config in, Deepgram Settings out
+
+You work with a flat config object (the shape of `DEFAULT_CONFIG`). The builders turn it into Deepgram's nested Settings message. Any key you omit falls back to `DEFAULT_CONFIG`.
+
+<CodeGroup>
+```js Input
+buildSettings({
+  listenModel: 'nova-3',
+  thinkProvider: 'anthropic',
+  thinkModel: 'claude-haiku-4-5',
+  speakModel: 'aura-2-thalia-en',
+  tags: 'demo,office',
+});
+```
+
+```json Output (abridged)
+{
+  "type": "Settings",
+  "tags": ["demo", "office"],
+  "experimental": false,
+  "mip_opt_out": false,
+  "flags": { "history": true },
+  "audio": {
+    "input": { "encoding": "linear16", "sample_rate": 24000 },
+    "output": { "encoding": "linear16", "sample_rate": 24000, "container": "none" }
+  },
+  "agent": {
+    "listen": { "provider": { "type": "deepgram", "model": "nova-3", "version": "v2", "language": "en", "smart_format": false } },
+    "think": {
+      "provider": { "type": "anthropic", "model": "claude-haiku-4-5", "temperature": 0.6 },
+      "prompt": "You are a terse, precise voice operator with real tools. …",
+      "functions": [ { "name": "end_call", "description": "…", "parameters": { … }, "defer_until_eot": true }, … ]
+    },
+    "speak": { "provider": { "type": "deepgram", "model": "aura-2-thalia-en", "speed": 1 } },
+    "greeting": "Channel open. What do you need?"
+  }
+}
+```
+</CodeGroup>
+
+## Functions
+
+<ResponseField name="buildAgentConfig(cfg)" type="object">
+  Returns just the `agent` half (`listen`, `think`, `speak`, `greeting`, optional `context`). This is what the SDK's `agent:` option takes inline. Applies the [Flux vs Aura rules](/concepts/voice-agent#flux-vs-aura-the-rules) and attaches `functionDefs()`.
+</ResponseField>
+
+<ResponseField name="buildSettings(cfg)" type="object">
+  Full `Settings` message: `tags`, `experimental`, `mip_opt_out`, `flags.history`, `audio` input/output, and `agent`. Send this first on a raw socket.
+</ResponseField>
+
+## Config keys
+
+<Expandable title="All DEFAULT_CONFIG keys">
+  <ResponseField name="listenModel" type="string" default="flux-general-en" />
+  <ResponseField name="listenVersion" type="string" default="v2" />
+  <ResponseField name="listenLanguage" type="string" default="en">Non-Flux only.</ResponseField>
+  <ResponseField name="keyterms" type="string | string[]" default="''">Comma-separated or array. Boosts recognition of names and jargon.</ResponseField>
+  <ResponseField name="eotThreshold" type="number" default="0.7">Flux only.</ResponseField>
+  <ResponseField name="eagerEotThreshold" type="number" default="0.5">Flux only.</ResponseField>
+  <ResponseField name="eotTimeoutMs" type="number" default="5000">Flux only.</ResponseField>
+  <ResponseField name="languageHints" type="string | string[]">`flux-general-multi` only.</ResponseField>
+  <ResponseField name="smartFormat" type="boolean" default="false">Non-Flux only.</ResponseField>
+  <ResponseField name="thinkProvider" type="string" default="google" />
+  <ResponseField name="thinkModel" type="string" default="gemini-3.1-flash-lite" />
+  <ResponseField name="temperature" type="number" default="0.6" />
+  <ResponseField name="reasoningMode" type="string" default="none">`low` / `medium` / `high` adds `reasoning_mode`.</ResponseField>
+  <ResponseField name="contextLength" type="number | 'max' | ''" default="''" />
+  <ResponseField name="prompt" type="string">System prompt describing the tools.</ResponseField>
+  <ResponseField name="greeting" type="string" default="Channel open. What do you need?" />
+  <ResponseField name="context" type="message[]">Prior messages, sent as `agent.context.messages`.</ResponseField>
+  <ResponseField name="speakProvider" type="string" default="deepgram" />
+  <ResponseField name="speakVersion" type="string" default="v2">Flux voices only.</ResponseField>
+  <ResponseField name="speakModel" type="string" default="flux-heather-en" />
+  <ResponseField name="speed" type="number" default="1.0" />
+  <ResponseField name="expressivity" type="number" default="0">Flux v2 only, sent when non-zero.</ResponseField>
+  <ResponseField name="inputEncoding" type="string" default="linear16" />
+  <ResponseField name="inputSampleRate" type="number" default="24000" />
+  <ResponseField name="outputEncoding" type="string" default="linear16" />
+  <ResponseField name="outputSampleRate" type="number" default="24000" />
+  <ResponseField name="outputContainer" type="string" default="none" />
+  <ResponseField name="tags" type="string | string[]" default="[]" />
+  <ResponseField name="experimental" type="boolean" default="false" />
+  <ResponseField name="mipOptOut" type="boolean" default="false">Opt out of Deepgram's Model Improvement Program.</ResponseField>
+  <ResponseField name="history" type="boolean" default="true" />
+</Expandable>
+
+## SCHEMA
+
+Option lists the dashboard's dropdowns use: `listenModels`, `languages`, `thinkProviders`, `thinkModels[provider]`, `reasoningModes`, `speakProviders`, `speakModels[provider]` (138 Deepgram voices), `inputEncodings`, `outputEncodings`, `sampleRates`, `containers`, `serverEvents`.

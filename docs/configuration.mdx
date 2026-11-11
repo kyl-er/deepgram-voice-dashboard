@@ -1,0 +1,57 @@
+---
+title: "Configuration"
+description: "Every environment variable DG//VOX reads, and where it looks for them."
+icon: "settings"
+---
+
+## Environment variables
+
+| Variable | Default | Used by | Purpose |
+|---|---|---|---|
+| `DEEPGRAM_API_KEY` | none (required) | `server.js` | Primary key for all Deepgram calls. |
+| `DEEPGRAM_V2_API_KEY` | none | `server.js` | Secondary key, selected per request with `?key=secondary`. |
+| `DEEPGRAM_BASE_URL` | `https://api.deepgram.com` | `server.js` | Override for a regional or proxied API host. |
+| `PORT` | `8787` | `server.js` | HTTP port. |
+| `HOST` | `127.0.0.1` | `server.js` | Bind address. See the warning below. |
+| `DGVOX_CDP_URL` | `http://127.0.0.1:9223` | `agent-tools.js` | Chrome DevTools endpoint for the browser tools. |
+| `DGVOX_GRAPH_DIR` | `~/Projects/graph-ctl` | `agent-tools.js` | Working directory for the `rfgraph` CLI. |
+| `DGVOX_RFGRAPH_BIN` | `$DGVOX_GRAPH_DIR/.venv/bin/rfgraph` | `agent-tools.js` | Path to the `rfgraph` binary. |
+
+<Warning>
+`HOST=0.0.0.0` exposes the unauthenticated `run_bash` tool to your network. Only do it on a network you fully trust, such as a private Tailscale tailnet.
+</Warning>
+
+## Key lookup order
+
+`env.js` runs before anything else in `server.js` and resolves the three `DEEPGRAM_*` variables. The first hit wins:
+
+<Steps>
+  <Step title="process.env">
+    Covers `export` in your shell rc (when started from that shell) and Windows `setx` (in terminals opened after it ran).
+  </Step>
+  <Step title="Shell rc files (Linux / macOS)">
+    Parses `export X=...` or `X=...` lines in `~/.bashrc`, `~/.bash_profile`, `~/.profile`. Handles quotes and trailing comments.
+  </Step>
+  <Step title="Windows registry">
+    Queries `HKCU\Environment` (where `setx` writes), then the machine hive (`setx /M`).
+  </Step>
+  <Step title=".env file">
+    Loaded by `dotenv/config` from the project root. Copy `.env.example` to use it.
+  </Step>
+</Steps>
+
+The server logs which source it used on startup:
+
+```text
+primary key: set (abcd…, from registry (setx)) | secondary: missing
+```
+
+## Using a second key
+
+Every proxy route accepts `?key=secondary`. Useful for splitting usage between projects or testing a key with different scopes:
+
+```bash
+curl -s -X POST 'localhost:8787/api/deepgram/token?key=secondary'
+```
+
+If `DEEPGRAM_V2_API_KEY` isn't set, the primary key is used silently.

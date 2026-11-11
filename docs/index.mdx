@@ -1,0 +1,53 @@
+---
+title: "DG//VOX"
+description: "A browser console for Deepgram: talk to a tool-calling voice agent, transcribe and synthesize speech, and analyze text, with your API key kept on the server."
+icon: "audio-lines"
+---
+
+DG//VOX is a small Express server plus a single-page dashboard. The server holds your Deepgram API key and proxies every request; the browser only ever sees short-lived tokens.
+
+<CardGroup cols={3}>
+  <Card title="AGENT · HOME" icon="bot" href="/concepts/voice-agent">
+    Live speech-in, speech-out agent over `wss://agent.deepgram.com/v1/agent/converse`, with function calling.
+  </Card>
+  <Card title="SIMPLE VOICE" icon="mic" href="/api-reference/stt">
+    Record or upload audio for STT (`/v1/listen`) and play back TTS (`/v1/speak`) with Aura-2 and Flux voices.
+  </Card>
+  <Card title="TEXT INTEL" icon="file-text" href="/api-reference/read">
+    Summary, sentiment, topics and intents from `/v1/read`.
+  </Card>
+</CardGroup>
+
+## What the agent can do
+
+The voice agent isn't just a chatbot. It can call real tools on your machine through the server:
+
+<CardGroup cols={2}>
+  <Card title="Browser" icon="globe" href="/tools/browser">
+    Navigate, read, click and type in your already-open Chrome over CDP.
+  </Card>
+  <Card title="Files" icon="folder-open" href="/tools/files">
+    List and read text files under your home directory, with hidden and secret-looking paths blocked.
+  </Card>
+  <Card title="Shell" icon="terminal" href="/tools/shell">
+    Run any bash (or PowerShell) command and hear the output.
+  </Card>
+  <Card title="Graph" icon="share-2" href="/tools/graph">
+    Build a live React Flow knowledge graph one node at a time.
+  </Card>
+</CardGroup>
+
+<Warning>
+The agent-tool routes are unauthenticated and include an unrestricted shell. The server binds to `127.0.0.1` for that reason. Read [Agent tools overview](/tools/overview) before setting `HOST=0.0.0.0`.
+</Warning>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart" horizontal>
+    Key, install, build, run. About two minutes.
+  </Card>
+  <Card title="Architecture" icon="workflow" href="/concepts/architecture" horizontal>
+    How a spoken request becomes a tool call.
+  </Card>
+</Columns>

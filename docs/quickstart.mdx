@@ -1,0 +1,109 @@
+---
+title: "Quickstart"
+description: "Set your Deepgram key, build the browser bundle, and open the console."
+icon: "rocket"
+---
+
+<Info>
+**Prerequisites:** Node.js 18 or newer and a Deepgram API key from [console.deepgram.com](https://console.deepgram.com).
+</Info>
+
+<Steps>
+  <Step title="Set your API key">
+    Set it once as an OS environment variable. No `.env` file is needed.
+
+    <Tabs>
+      <Tab title="Linux / macOS" icon="terminal">
+        Add to `~/.bashrc` (or `~/.bash_profile` / `~/.profile`):
+
+        ```bash ~/.bashrc
+        export DEEPGRAM_API_KEY="your_key_here"
+        ```
+
+        Then reload:
+
+        ```bash
+        source ~/.bashrc
+        ```
+
+        <Tip>The server also parses these rc files directly, so it finds the key even when launched from systemd or an IDE that skips your interactive shell.</Tip>
+      </Tab>
+      <Tab title="Windows" icon="monitor">
+        ```powershell PowerShell
+        setx DEEPGRAM_API_KEY "your_key_here"
+        ```
+
+        <Tip>`setx` only affects terminals opened afterwards, but the server reads the value straight from the registry (`HKCU\Environment`), so it works in an already-open terminal too.</Tip>
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    git clone https://github.com/kyl-er/deepgram-voice-dashboard
+    cd deepgram-voice-dashboard
+    npm install
+    ```
+  </Step>
+
+  <Step title="Build the browser bundle">
+    ```bash
+    npm run build
+    ```
+
+    This uses esbuild to bundle `public/deepgram-agent.js` and the locally installed `@deepgram/agents` SDK into `public/deepgram-agent.bundle.js`.
+
+    <Accordion title="Why not load the SDK from esm.sh?">
+      `@deepgram/agents` depends on the Node-only `ws` package. Loaded from esm.sh, the browser throws `does not provide an export named 'WebSocket'`. Bundling with `--platform=browser` sidesteps that. Re-run `npm run build` whenever you edit `deepgram-agent.js`.
+    </Accordion>
+  </Step>
+
+  <Step title="Start the server">
+    ```bash
+    npm start
+    ```
+
+    You should see:
+
+    ```text
+    DG//VOX server on http://127.0.0.1:8787
+    primary key: set (abcd…, from shell rc file) | secondary: missing
+    ```
+
+    Open [http://localhost:8787](http://localhost:8787). The **AGENT · HOME** tab loads by default. Click connect, allow the microphone, and say something.
+  </Step>
+</Steps>
+
+## Verify it works
+
+Check the backend without opening the UI:
+
+<CodeGroup>
+```bash Health
+curl -s localhost:8787/api/health
+# {"ok":true,"hasPrimary":true,"hasSecondary":false,...}
+```
+
+```bash Token
+curl -s -X POST localhost:8787/api/deepgram/token
+# eyJhbGciOi...   (plain-text JWT, 300s TTL)
+```
+
+```bash TTS
+curl -s -X POST 'localhost:8787/api/tts?model=aura-2-thalia-en' \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Channel open."}' -o hello.mp3
+```
+</CodeGroup>
+
+<Check>If the token call returns a JWT, the agent tab will be able to connect.</Check>
+
+## Optional: enable browser control
+
+The browser tools attach to a Chromium you start with remote debugging on port 9223:
+
+```bash
+google-chrome --remote-debugging-port=9223
+```
+
+See [Browser tool](/tools/browser) for details.

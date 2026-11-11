@@ -1,0 +1,49 @@
+---
+title: "Troubleshooting"
+description: "Bugs that were actually hit while building DG//VOX, and their fixes."
+icon: "life-buoy"
+---
+
+<AccordionGroup>
+  <Accordion title="Agent connects but never thinks or speaks" icon="mic-off">
+    **Cause:** a function in `agent.think.functions` had a relative `endpoint.url`. Deepgram rejects the entire Settings message with `UNPARSABLE_CLIENT_MESSAGE`.
+
+    **Fix:** already handled. `functionDefs()` only emits `endpoint` for absolute URLs. If you add `serverSide: true` plugins, set `RUNTIME.functionEndpoint` to a full `https://` URL. See [Function calling](/concepts/function-calling).
+  </Accordion>
+
+  <Accordion title="Endless connect / close / reconnect loop, no Welcome" icon="refresh-cw">
+    **Cause:** `@deepgram/agents` treats `url` as a base and appends `/v1/agent/converse` itself. Passing the full socket URL doubles the path.
+
+    **Fix:** `startSession()` strips `/v1/agent/converse` from `RUNTIME.agentSocket` before passing it to the SDK. Keep that if you override the socket.
+  </Accordion>
+
+  <Accordion title="INVALID_SETTINGS: not a Flux model, but Flux was selected by version=&quot;v2&quot;" icon="volume-x">
+    **Cause:** `speak.provider.version: "v2"` sent with an Aura voice.
+
+    **Fix:** `buildAgentConfig()` only adds `version` and `expressivity` for `flux-*` voices. See the interactive preview in [Voice agent](/concepts/voice-agent).
+  </Accordion>
+
+  <Accordion title="Tools always receive empty arguments" icon="brackets">
+    **Cause:** reading `fn.input` instead of `fn.arguments`. Deepgram sends args as a JSON string in `arguments`.
+
+    **Fix:** `dispatchFunctionCall()` parses `fn.arguments`.
+  </Accordion>
+
+  <Accordion title="does not provide an export named 'WebSocket'" icon="package-x">
+    **Cause:** loading `@deepgram/agents` from esm.sh pulls in the Node-only `ws` package.
+
+    **Fix:** run `npm run build` and import `deepgram-agent.bundle.js`.
+  </Accordion>
+
+  <Accordion title="primary key: MISSING" icon="key-round">
+    Check the lookup order on [Configuration](/configuration). On Windows, `setx` writes to the registry; the server reads `HKCU\Environment` directly, so restarting the terminal isn't required. On Linux, make sure the line is `export DEEPGRAM_API_KEY=...` in one of `~/.bashrc`, `~/.bash_profile`, `~/.profile`.
+  </Accordion>
+
+  <Accordion title="Browser tools: connect ECONNREFUSED 127.0.0.1:9223" icon="globe">
+    Chrome isn't running with remote debugging. Start it with `--remote-debugging-port=9223`, or set `DGVOX_CDP_URL`.
+  </Accordion>
+
+  <Accordion title="forceEndTurn does nothing" icon="circle-slash">
+    `@deepgram/agents` v0.1.2 has no ForceEndTurn API, so the SDK session's `forceEndTurn()` is a logged no-op. `RawAgentSocket.forceEndTurn()` does send the message.
+  </Accordion>
+</AccordionGroup>

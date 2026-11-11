@@ -1,0 +1,41 @@
+---
+title: "API introduction"
+description: "The DG//VOX server's HTTP routes. Every page in this tab is generated from openapi.json and includes a live playground."
+icon: "square-terminal"
+---
+
+The server listens on `http://localhost:8787` by default. Routes fall into three groups:
+
+<CardGroup cols={3}>
+  <Card title="Deepgram proxy" icon="arrow-right-left" href="/api-reference/token">
+    Token grant, STT, TTS and Text Intelligence. Adds your key and forwards to `api.deepgram.com`.
+  </Card>
+  <Card title="Agent functions" icon="wrench" href="/api-reference/agent-functions">
+    One dispatch route for all 16 agent tools.
+  </Card>
+  <Card title="Status" icon="activity" href="/api-reference/health">
+    Health and UI enums.
+  </Card>
+</CardGroup>
+
+## Authentication
+
+There is none, on purpose: the server binds to `127.0.0.1`, and the Deepgram key is added server-side. The browser never sends a key.
+
+## Choosing a key
+
+Every proxy route accepts `?key=secondary` to use `DEEPGRAM_V2_API_KEY`. It falls back to the primary key when the secondary isn't set.
+
+## Pass-through behavior
+
+| Route | Query params forwarded |
+|---|---|
+| `/api/stt` | **all** of them, to `/v1/listen` |
+| `/api/tts` | all, plus `model` (default `aura-2-thalia-en`) |
+| `/api/read` | only `summarize`, `sentiment`, `topics`, `intents`, `language`, `custom_topic`, `custom_intent` |
+
+Responses from Deepgram (including error status codes) are returned unchanged.
+
+<Tip>
+The playground calls `localhost:8787` from your browser. Start the server with `npm start` and the "Send" button on each endpoint page works against your real Deepgram account.
+</Tip>

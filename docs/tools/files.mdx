@@ -1,0 +1,51 @@
+---
+title: "Files"
+description: "Read-only access to text files under your home directory, with hidden and secret paths blocked."
+icon: "folder-open"
+---
+
+## Sandbox rules
+
+`resolveSandboxed()` in `server.js` is the only boundary on these routes. A path is refused if:
+
+<Steps>
+  <Step title="It escapes $HOME">
+    Resolved against `os.homedir()`; any `..` that leaves it returns an error.
+  </Step>
+  <Step title="Any component starts with a dot">
+    Blocks `.ssh`, `.aws`, `.gnupg`, `.config`, `.env`, `.git`, `.claude`, `.npmrc`, shell history, and so on.
+  </Step>
+  <Step title="The filename looks like a secret">
+    Matches names containing `credentials`, `secret(s)`, `password`, `passwd`, `shadow`, `token`, `apikey`, `api_key`, `wallet`; extensions `.pem`, `.key`, `.ppk`, `.kdbx`; and `id_rsa` / `id_ed25519` / `id_ecdsa` / `id_dsa` (and `.pub`).
+  </Step>
+</Steps>
+
+Blocked entries are also hidden from `list_files` output, so the model never learns they exist.
+
+## Functions
+
+<ResponseField name="list_files" type="{ path? }">
+  Path relative to home; blank lists home itself. Returns `{ path, entries: [{ name, type: 'dir'|'file'|'other', size }] }`.
+</ResponseField>
+
+<ResponseField name="read_file" type="{ path }">
+  Returns `{ path, size, content }`. Refuses non-regular files, files over **200 KB**, and anything with a null byte in the first 1,000 bytes (binary).
+</ResponseField>
+
+<Note>
+`run_bash` can read anything these tools block. The file sandbox protects against careless reads, not against a model that decides to `cat ~/.ssh/id_ed25519` through the shell.
+</Note>
+
+## Example
+
+<CodeGroup>
+```bash Request
+curl -s -X POST localhost:8787/api/agent/functions/read_file \
+  -H 'Content-Type: application/json' \
+  -d '{"path":".ssh/config"}'
+```
+
+```json Response
+{ "error": "path is outside the allowed sandbox, hidden, or a blocked (secret-looking) filename" }
+```
+</CodeGroup>

@@ -1,0 +1,76 @@
+---
+title: "Sessions"
+description: "fetchToken(), startSession() and RawAgentSocket."
+icon: "radio"
+---
+
+## startSession(cfg, handlers)
+
+Connects, starts the mic, and returns a controller. `cfg` is merged over `DEFAULT_CONFIG`.
+
+```js
+import { startSession } from './deepgram-agent.bundle.js';
+
+const agent = await startSession(
+  { speakModel: 'flux-kit-en', greeting: 'Ready.' },
+  {
+    conversationText: (m) => console.log(m.role, m.content),
+    functionCallRequest: (m) => console.log('tool', m.functions.map((f) => f.name)),
+    error: (e) => console.error(e),
+    any: (kind, payload) => {},          // every event
+  },
+);
+
+agent.injectUser('List my Projects folder');
+// later
+agent.stop();
+```
+
+### Handlers
+
+Event names are camelCased: `welcome`, `settingsApplied`, `conversationText`, `userStartedSpeaking`, `agentThinking`, `agentStartedSpeaking`, `agentAudioDone`, `functionCallRequest`, `promptUpdated`, `speakUpdated`, `thinkUpdated`, `injectionRefused`, `latencyReport`, `history`, `connecting`, `connected`, `reconnecting`, `disconnected`, `error`, `warning`, `sdkError`, plus `any(kind, payload)`.
+
+<Note>Tool dispatch happens automatically. Your `functionCallRequest` handler is for logging and UI, not for answering.</Note>
+
+### Connection settings
+
+| | |
+|---|---|
+| Auth | `{ tokenFactory: fetchToken }`, or `{ apiKey }` when `RUNTIME.apiKey` is set |
+| Keepalive | every 10 s |
+| Reconnect | up to 8 attempts, 500 ms → 30 s backoff with jitter |
+| Mic | echo cancellation, noise suppression, auto gain |
+
+### Returned controller
+
+<ResponseField name="session, mic, player" type="SDK objects">The underlying `AgentSession`, `AgentMicrophone`, `AgentPlayer`.</ResponseField>
+<ResponseField name="inputSpectrum() / outputSpectrum()" type="Uint8Array">0–255 frequency data for visualizers.</ResponseField>
+<ResponseField name="inputVolume() / outputVolume()" type="number">Current levels.</ResponseField>
+<ResponseField name="updatePrompt(p) / updateSpeak(s) / updateListen(l) / updateThink(t)" type="void">Change the agent mid-session.</ResponseField>
+<ResponseField name="injectUser(text) / injectAgent(text)" type="void">Insert a turn without speaking it.</ResponseField>
+<ResponseField name="interrupt()" type="boolean">Drop queued TTS so the agent stops instantly. Client-side only: Deepgram's transcript still contains the full reply, so follow with `injectUser()` if the agent needs to know.</ResponseField>
+<ResponseField name="forceEndTurn()" type="void">No-op with a console warning. Not supported by `@deepgram/agents` v0.1.2.</ResponseField>
+<ResponseField name="stop()" type="void">Stops mic, disposes player, disconnects.</ResponseField>
+
+## fetchToken()
+
+Returns `RUNTIME.apiKey` if set; otherwise POSTs `RUNTIME.tokenUrl` and returns the body (plain text or `access_token` from JSON). Throws `token <status> from <url>` on failure.
+
+## RawAgentSocket
+
+No SDK. Sends `buildSettings(cfg)` on open and emits each server message by its `type`.
+
+```js
+const ws = new RawAgentSocket({ listenModel: 'nova-3' });
+ws.on('ConversationText', (m) => console.log(m.content));
+ws.on('audio', (buf) => myPlayer.enqueue(buf));
+ws.on('FunctionCallRequest', (m) => dispatchFunctionCall(ws, m));
+await ws.connect();
+ws.sendAudio(pcmChunk);
+```
+
+Methods: `send`, `sendAudio`, `updateListen`, `updateThink`, `updateSpeak`, `updatePrompt`, `injectUser`, `injectAgent`, `forceEndTurn`, `keepAlive`, `sendFunctionCallResponse`, `disconnect`. Events also fire as `message` and `*`.
+
+<Warning>
+`RawAgentSocket` authenticates with subprotocol `["token", <value>]`, which is the raw-API-key form. With the default token route you get a grant JWT, which the SDK sends as `["bearer", <jwt>]`. Use `RUNTIME.apiKey` for raw-path experiments or change the subprotocol to `bearer`.
+</Warning>
